@@ -1,0 +1,19 @@
+{
+    "name": "mcms/wp-astro",
+    "type": "plugin",
+    "autoload": {
+        "psr-4": {
+            "Mcms\\WpAstro\\": "wp-content/plugins/mcms-plugin/"
+        }
+    },
+    "authors": [
+        {
+            "name": "mbouclas"
+        }
+    ],
+    "require": {
+        "guzzlehttp/guzzle": "^7.8",
+        "halaxa/json-machine": "^1.1",
+        "cocur/slugify": "^4.5"
+    }
+}
