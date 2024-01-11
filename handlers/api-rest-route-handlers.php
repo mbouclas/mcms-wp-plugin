@@ -13,6 +13,10 @@ function handle_boot_request() {
 		}
 		$values[$field['name']] = get_field($field['name'], 'option');
 	}
+
+	$values['adminUrl'] = get_admin_url();
+	$values['cssUrl'] = plugins_url( '../assets/styles.css', __FILE__ );
+
 	return new \WP_REST_Response( ['syncSettings'=> $values] );
 }
 

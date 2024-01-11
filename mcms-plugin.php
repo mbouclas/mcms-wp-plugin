@@ -3,7 +3,7 @@
 Plugin Name: Mcms Plugin
 Plugin URI: http://URI_Of_Page_Describing_Plugin_and_Updates
 Description: A brief description of the Plugin.
-Version: 1.3
+Version: 1.3.1
 Author: mbouclas
 Author URI: http://URI_Of_The_Plugin_Author
 License: A "Slug" license name e.g. GPL2
@@ -25,33 +25,55 @@ require_once 'includes/settings-page.php';
 
 // register the plugin
 register_activation_hook( __FILE__, 'mcms_plugin_activate' );
-register_deactivation_hook( __FILE__, 'mcms_deactivate' );
+register_deactivation_hook( __FILE__, 'mcms_plugin_deactivate' );
 
 add_action( 'admin_menu', 'Mcms\Handlers\OptionsPage\mcms_options_page' );
 add_action( 'admin_enqueue_scripts', 'enque_mcms_scripts' );
+add_action('admin_enqueue_scripts', 'enqueue_admin_styles');
 add_action('admin_footer', 'add_custom_html_to_admin_footer', 999);
 add_action('admin_bar_menu', 'add_toolbar_button', 999);
+add_action('add_meta_boxes', 'add_mcms_controls');
 add_filter('script_loader_tag', 'add_type_attribute' , 10, 3);
 function mcms_plugin_activate() {
 
 }
 
+function mcms_plugin_deactivate() {
+
+}
+
+function add_mcms_controls() {
+	add_meta_box(
+		'mcms_controls', // Unique ID
+		'Mcms', // Box title
+		'mcms_meta_box', // Content callback, must be of type callable
+		null, // Post type
+        'side', // Position
+	);
+}
+
+function mcms_meta_box($post) {
+	echo '<refresh-data mode="full"></refresh-data>';
+}
+
 function enque_mcms_scripts( $hook ) {
-	if ('toplevel_page_mcms' !== $hook) {
-		return;
-	}
+
+
 	wp_enqueue_script(
 		'mcsm-app',
 		plugins_url( '/assets/main.js', __FILE__ ),
 		[],
-		'1.1.0',
+		'1.1.9',
 		[
 			'in_footer' => true,
 			'type' => 'module'
 		]
 	);
-	wp_enqueue_style( 'mcms-styles', plugins_url( '/assets/styles.css', __FILE__ ) );
 
+}
+
+function enqueue_admin_styles() {
+	wp_enqueue_style( 'mcms-styles', plugins_url( '/assets/styles.css', __FILE__ ), false, '1.1.9' );
 }
 
 function add_type_attribute($tag, $handle, $src) {
