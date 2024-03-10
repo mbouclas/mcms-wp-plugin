@@ -15,7 +15,8 @@ function handle_boot_request() {
 	}
 
 	$values['adminUrl'] = get_admin_url();
-	$values['cssUrl'] = plugins_url( '../assets/styles.css', __FILE__ );
+
+	$values['cssUrl'] = plugins_url( 'mcms-plugin/assets/styles.css' );
 
 	return new \WP_REST_Response( ['syncSettings'=> $values] );
 }

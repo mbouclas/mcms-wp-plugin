@@ -4,6 +4,13 @@ use \WP_REST_Request;
 use \WP_REST_Response;
 use \WP_Error;
 use acf_options_page;
+
+function handle_get_all_post_types() {
+	$post_types = get_post_types([], 'objects');
+	return $post_types;
+}
+
+
 function handle_get_acf_group_fields_request( WP_REST_Request $request ) {
 	// get the fields from acf. The id is passed as a query param ?id=123
 	$groupId = $request->get_param( 'id' );
