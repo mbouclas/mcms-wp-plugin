@@ -32,6 +32,10 @@ class ComposerStaticInit27abc5eab231fe26708be9167e5f1bf3
             'GuzzleHttp\\Promise\\' => 19,
             'GuzzleHttp\\' => 11,
         ),
+        'F' => 
+        array (
+            'Firebase\\JWT\\' => 13,
+        ),
         'C' => 
         array (
             'Cocur\\Slugify\\' => 14,
@@ -67,6 +71,10 @@ class ComposerStaticInit27abc5eab231fe26708be9167e5f1bf3
         'GuzzleHttp\\' => 
         array (
             0 => __DIR__ . '/..' . '/guzzlehttp/guzzle/src',
+        ),
+        'Firebase\\JWT\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/firebase/php-jwt/src',
         ),
         'Cocur\\Slugify\\' => 
         array (

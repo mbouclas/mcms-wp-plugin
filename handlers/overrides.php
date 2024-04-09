@@ -77,7 +77,6 @@ function sanitize_post_slug($data, $postarr) {
 
 	if (empty($data['post_name']) || strpos($data['post_name'], 'auto-draft') === 0) {
 		$data['post_name'] = $slugify->slugify($data['post_title']);
-		echo $data['post_name'];
 	}
 
 

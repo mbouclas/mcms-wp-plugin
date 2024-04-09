@@ -41,6 +41,7 @@ function handle_get_menus_request(WP_REST_Request $request) {
 			$fields = get_fields($item->ID);
 			if ($fields) {
 				$menu_items[$item_key]->acf_fields = $fields;
+				$menu_items[$item_key]->acf = $fields;
 			}
 		}
 		$menus[$key]->items = $menu_items;

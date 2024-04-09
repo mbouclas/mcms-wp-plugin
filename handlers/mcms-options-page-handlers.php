@@ -13,6 +13,7 @@ function mcms_options_page() {
 	);
 }
 
+
 function mcms_dashboard_page_html() {
 	// check user capabilities
 	if ( ! current_user_can( 'manage_options' ) ) {
