@@ -29,7 +29,8 @@ function handle_build_request() {
 		$astroFolder = get_field('astro_folder', 'option'); // Replace with your project name
 		$buildScript = get_field('build_script', 'option');
 
-		return new \WP_REST_Response( executeShellCommand("cd $astroFolder && \"./$buildScript\"") );
+//		return new \WP_REST_Response( executeShellCommand("cd $astroFolder && \"./$buildScript\"") );
+		return new \WP_REST_Response( executeShellCommand("./execute_script.sh $buildScript") );
 	}
 
 	$account_id = get_field('cloudflare_account_id', 'option'); // Replace with your Cloudflare account ID

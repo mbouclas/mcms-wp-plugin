@@ -17,6 +17,8 @@ add_action( 'rest_api_init', function () {
 		'permission_callback' => '__return_true',
 	]);
 
+
+
 	register_rest_route( 'mcms/v1', '/menus/', [
 		'methods' => 'GET',
 		'callback' => '\Mcms\Handlers\handle_get_menus_request',
@@ -76,6 +78,20 @@ add_action( 'rest_api_init', function () {
 		'callback' => '\Mcms\Handlers\handle_get_all_post_types',
 		'permission_callback' => '__return_true',
 	]);
+
+	register_rest_route( 'mcms/v1', '/subscriber/', [
+		'methods' => 'POST',
+		'callback' => '\Mcms\Handlers\Subscribers\store',
+		'permission_callback' => '__return_true',
+	]);
+
+	register_rest_route( 'mcms/v1', '/subscriber/', [
+		'methods' => 'PATCH',
+		'callback' => '\Mcms\Handlers\Subscribers\update',
+		'permission_callback' => '__return_true',
+	]);
+
+
 
 	register_rest_route( 'mcms/v1', '/cloudinary-test/', [
 		'methods' => 'GET',

@@ -79,7 +79,6 @@ function sanitize_post_slug($data, $postarr) {
 		$data['post_name'] = $slugify->slugify($data['post_title']);
 	}
 
-
 	return $data;
 }
 
@@ -88,9 +87,14 @@ function sanitize_term_slug($data, $term_id, $taxonomy) {
 	$slugify = new Slugify(['lowercase' => true]);
 	$slugify->activateRuleSet('greek');
 	$slugify->activateRuleSet('russian');
-	if (empty($data['slug'])) {
-		$data['slug'] = $slugify->slugify($data['name']);
-	}
-
+	$data['slug'] = $slugify->slugify($data['name']);
 	return $data;
 }
+
+function sanitizeString($str) {
+	$slugify = new Slugify(['lowercase' => true]);
+	$slugify->activateRuleSet('greek');
+
+	return $slugify->slugify($str);
+}
+

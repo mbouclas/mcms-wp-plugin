@@ -37,6 +37,9 @@ function handle_get_menus_request(WP_REST_Request $request) {
 
 	foreach ($menus as $key => $menu) {
 		$menu_items = wp_get_nav_menu_items($menu->term_id);
+
+
+		$menus[$key]->items = [];
 		foreach ($menu_items as $item_key => $item) {
 			$fields = get_fields($item->ID);
 			if ($fields) {
@@ -44,10 +47,43 @@ function handle_get_menus_request(WP_REST_Request $request) {
 				$menu_items[$item_key]->acf = $fields;
 			}
 		}
-		$menus[$key]->items = $menu_items;
+
+		$menus[$key]->items = buildNestedMenu($menu_items);
 	}
 	return new WP_REST_Response( $menus );
 
+}
+
+function buildNestedMenu($menu_items) {
+	// Initialize an array to hold the nested menu
+	$nested_menu = [];
+
+	// Create an associative array to hold references to all items by their ID
+	$items_by_id = [];
+
+	// First pass: Initialize the items_by_id array
+	foreach ($menu_items as $item) {
+		$items_by_id[$item->ID] = $item;
+		$item->children = []; // Initialize the children array
+	}
+
+	// Second pass: Build the nested structure
+	foreach ($menu_items as $item) {
+		if ($item->menu_item_parent == 0) {
+			// This is a root item, add it to the nested menu
+			$nested_menu[] = $item;
+		} else {
+			// This is a child item, add it to its parent's children array
+			if (isset($items_by_id[$item->menu_item_parent])) {
+				$items_by_id[$item->menu_item_parent]->children[] = $item;
+			} else {
+				// Handle the case where the parent ID does not exist
+				error_log("Parent ID {$item->menu_item_parent} not found for item ID {$item->ID}");
+			}
+		}
+	}
+
+	return $nested_menu;
 }
 
 function getFieldsForAllGroups() {
@@ -113,3 +149,4 @@ function getOptionsPageValues() {
 function handle_contact_request(WP_REST_Request $request) {
 
 }
+

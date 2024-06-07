@@ -11,6 +11,64 @@ use function \Mcms\Includes\Helpers\formatOptionValues;
 
 
 add_action('init', 'Mcms\Api\WooRestRouteHandlers\check_customer');
+
+function get_media(WP_REST_Request $request) {
+	$req = new WP_REST_Request( 'GET', '/wp/v2/media' );
+	$administrators = get_users(array('role' => 'administrator'));
+
+	wp_set_current_user($administrators[0]->ID);
+// Set parameters if needed.
+	$params = $request->get_params();
+	foreach ($params as $key => $value) {
+		$req->set_param( $key, $value );
+	}
+
+	$req->set_param('status', 'inherit');
+
+// Get a reference to the WP_REST_Server instance.
+	$server = rest_get_server();
+
+// Process the request.
+	$response = $server->dispatch( $req );
+
+// Get the response data.
+	$data = $response->get_data();
+	return new WP_REST_Response($data, $response->get_status(), $response->get_headers());
+/*	$args = array(
+		'post_type'      => 'attachment',
+		'post_mime_type' => 'image',
+		'post_status'    => 'inherit',
+		'posts_per_page' => $limit,
+		'paged'          => $page,
+	);
+
+	$query_images = new WP_Query($args);
+	$images = array();
+	foreach ($query_images->posts as $image) {
+		// Get the full attachment object
+		$attachment = get_post($image->ID);
+		// Get ACF fields for the attachment
+		$acf_fields = get_fields($image->ID);
+		// Add the ACF fields to the attachment object
+		$attachment->acf_fields = $acf_fields;
+		$attachment->title = ['rendered' => $attachment->post_title];
+		// Get additional fields for the attachment
+		$attachment_fields = wp_prepare_attachment_for_js($image->ID);
+		// Add the additional fields to the attachment object
+		$attachment->alt_text = $attachment_fields['alt'];
+		$attachment->media_details = $attachment_fields['media_details'];
+		$attachment->media_title = $attachment_fields['title'];
+		$attachment->caption = $attachment_fields['caption'];
+		$attachment->description = $attachment_fields['description'];
+		$attachment->source_url = wp_get_attachment_url($image->ID);
+		// Add the attachment object to the images array
+		$images[] = $attachment;
+	}
+
+
+	return $images;*/
+}
+
 function check_customer() {
 	if (class_exists('WooCommerce')) {
 		if (null === WC()->session) {
@@ -33,6 +91,56 @@ function title_filter( $where, $wp_query ) {
 	return $where;
 }
 
+function product_variations( WP_REST_Request $request ) {
+	$args = array(
+		'post_type' => 'product_variation',
+		'posts_per_page' => -1,
+	);
+
+	$posts = get_posts($args);
+
+	$posts_array = array();
+	foreach ($posts as $post) {
+		$posts_array[] = (array) $post;
+	}
+
+	return new WP_REST_Response($posts_array);
+}
+
+function get_product_attributes( WP_REST_Request $request ) {
+	if (!function_exists('wc_get_attribute_taxonomies')) {
+		return new WP_REST_Response([]);
+	}
+
+	$attribute_taxonomies = wc_get_attribute_taxonomies();
+	$attributes = array();
+
+	foreach ($attribute_taxonomies as $tax) {
+		$taxonomy = wc_attribute_taxonomy_name($tax->attribute_name);
+		$terms = get_terms($taxonomy, array('hide_empty' => false));
+
+		$term_values = array();
+		foreach ($terms as $term) {
+			// Get ACF fields for the term
+			$acf_fields = get_fields($term);
+			$term_values[] = array_merge((array) $term, ['acf_fields' => $acf_fields]);
+		}
+
+		// Get ACF fields for the product attribute
+		$acf_fields = get_fields($taxonomy);
+
+		$attributes[] = array(
+			'id' => $tax->attribute_id,
+			'name' => $tax->attribute_name,
+			'label' => $tax->attribute_label,
+			'values' => $term_values,
+			'acf_fields' => $acf_fields
+		);
+	}
+
+	return $attributes;
+}
+
 /**
  * Get all products with filters from woocormmerce
  * @param WP_REST_Request $request
@@ -41,16 +149,19 @@ function title_filter( $where, $wp_query ) {
  */
 function get_products( WP_REST_Request $request ) {
 	$page = $request->get_param('page') ? $request->get_param('page') : 1;
+	$limit = $request->get_param('limit') ? $request->get_param('limit') : 10;
 	$title = $request->get_param('title');
 	$category = $request->get_param('category');
 	$price_from = $request->get_param('price_from');
 	$price_to = $request->get_param('price_to');
 	$withAggregations = $request->get_param('withAggregations');
+	$status = $request->get_param('status') ?: 'publish';
 
 	$args = array(
 		'post_type' => 'product',
-		'posts_per_page' => 10,
+		'posts_per_page' => $limit,
 		'paged' => $page,
+		'post_status' => $status,
 	);
 
 	// Add title filter if provided
@@ -107,6 +218,8 @@ function get_products( WP_REST_Request $request ) {
 		$data['acf'] = get_fields($product_obj->get_id()); // Get ACF fields for the product
 		// Get the featured image as an object
 		$data['featured_image'] = get_the_post_thumbnail_url($product_obj->get_id());
+
+//		$data['featured_image_id'] = get_post_thumbnail_id($product_obj->get_id());
 		// Get product attributes
 		$attributes = $product_obj->get_attributes();
 		$data['attributes'] = array();
@@ -119,10 +232,25 @@ function get_products( WP_REST_Request $request ) {
 			$data['variations'] = array();
 			$variation_ids = $product_obj->get_children();
 			foreach ($variation_ids as $variation_id) {
-				$variation = wc_get_product($variation_id);
-				$data['variations'][] = $variation->get_data();
+				$variationData = wc_get_product($variation_id);
+				$variation = $variationData->get_data();
+				$variation['featured_media'] = get_the_post_thumbnail_url($variation_id);
+				$variation['featured_media_id'] = get_post_thumbnail_id($variation_id);
+				$data['variations'][] = $variation;
 			}
 		}
+
+		$data['related_products'] = wc_get_related_products($product_obj->get_id(), 4);
+//		$data['upselling_products'] = $product_obj->get_upsell_ids();
+
+		if (class_exists('WPSEO_Meta')) {
+			$meta = \YoastSEO()->meta->for_post($product_obj->get_id());
+			$data['yoast_head_json'] = $meta->get_head()->json;
+		}
+
+		$data['primary_category'] = ( class_exists( 'WPSEO_Meta' ) ) ?
+			get_post_meta( $product->ID, '_yoast_wpseo_primary_product_cat', true ) :
+			$product_obj->get_category_ids()[0];
 
 		$product_data[] = $data;
 	}
@@ -143,32 +271,37 @@ function get_products( WP_REST_Request $request ) {
 
 function add_to_cart( WP_REST_Request $request ) {
 	$product_id = $request->get_param('product_id');
+	$variant = $request->get_param('variant') ?: null;
+	$variationId = $variant ? $variant['id'] : null;
+	$variationData = $variant ? $variant['attributes'] : null;
 	$quantity = $request->get_param('quantity') ? $request->get_param('quantity') : 1;
 	WC()->frontend_includes();
+	$productId = $variant ? $variant['id'] : $product_id;
 
 	if (!$product_id) {
 		return new WP_REST_Response(array('message' => 'Product ID is required'), 400);
 	}
 
-	$cart_id = WC()->cart->generate_cart_id($product_id);
+	$cart_id = WC()->cart->generate_cart_id($product_id, $variationId, $variationData);
 
 	$cart_item_key = WC()->cart->find_product_in_cart($cart_id);
 
-
+	error_log(print_r( '1  '.$product_id . ' = ' . $variationId, true));
+	error_log(print_r( '2  '.$cart_item_key, true));
 	if ( empty($cart_item_key) && is_array( WC()->cart->get_cart() ) && isset( WC()->cart->get_cart()[ $cart_id ] ) ) {
 		$cart_item_key = WC()->cart->get_cart()[ $cart_id ]['key'];
 	}
-
+	error_log(print_r('3 ' . key_exists($cart_id, WC()->cart->get_cart()) , true));
 	$cart_item_quantities = WC()->cart->get_cart_item_quantities();
 
 	if (key_exists($cart_id, WC()->cart->get_cart())) {
-		$quantity = $quantity + $cart_item_quantities[$product_id];
-
-		$added = WC()->cart->set_quantity($cart_item_key, $quantity);
+		$quantity = $quantity + $cart_item_quantities[ $productId ];
+		$added = WC()->cart->set_quantity( $cart_item_key, $quantity );
 	}
 	else {
-		$added = WC()->cart->add_to_cart( $product_id, $quantity );
+		$added = WC()->cart->add_to_cart( $product_id, $quantity, $variationId, $variationData );
 	}
+
 
 
 	if ($added) {
@@ -179,6 +312,7 @@ function add_to_cart( WP_REST_Request $request ) {
 		return new WP_REST_Response(array('message' => 'Failed to add product to cart'), 500);
 	}
 }
+
 
 function create_customer( WP_REST_Request $request ) {
 	$email = $request->get_param('email');
@@ -310,14 +444,38 @@ function get_cart(WP_REST_Request $request) {
 	WC()->cart->calculate_totals();
 //	print_r(WC()->session->get('chosen_shipping_methods'));
 
+	$applied_coupons = WC()->cart->get_applied_coupons();
+	$coupon_details = array();
+	foreach ($applied_coupons as $coupon_code) {
+		// Get the WC_Coupon object
+		$coupon = new \WC_Coupon($coupon_code);
+
+		// Get the coupon data
+		$data = $coupon->get_data();
+
+		// Add the coupon data to the array
+		$coupon_details[] = $data;
+	}
 
 	$cart = [];
+	$productOptions = [];
+
+
 	foreach (WC()->cart->get_cart() as $cart_item_key => $cart_item) {
 		$product = $cart_item['data'];
+		$isVariant = false;
+		if ($product instanceof \WC_Product_Variation) {
+			$isVariant = true;
+		}
+
+		if (class_exists('YayExtra\Classes\ProductPage')) {
+			$productOptions = \YayExtra\Classes\ProductPage::get_instance()->get_option_set_of_product($isVariant ? $product->get_parent_id() : $product->get_id(), \YayExtra\Helper\Utils::get_settings());
+		}
 
 		$cart[] = [
 			'key' => $cart_item_key,
 			'product_id' => $product->get_id(),
+			'parent_id' => $product->get_parent_id(),
 			'quantity' => $cart_item['quantity'],
 			'price' => $product->get_price(),
 			'name' => $product->get_name(),
@@ -327,13 +485,21 @@ function get_cart(WP_REST_Request $request) {
 			'permalink' => get_permalink($product->get_id()),
 			'acf' => get_fields($product->get_id()),
 			'shipping_class' => $product->get_shipping_class(),
+			'isVariant' => $isVariant,
+			'options' => $productOptions
 		];
 	}
 
+	$chosen_shipping_methods = WC()->session->get('chosen_shipping_methods');
+
+
 	return new WP_REST_Response([
 		'items' => $cart,
+		'totalItems' => WC()->cart->get_cart_contents_count(),
 		'totals' => WC()->cart->get_totals(),
-//		'customerShipping' => WC()->customer->get_shipping(),
+		'applied_discounts' => $coupon_details,
+		'selectedShippingMethod' => is_array($chosen_shipping_methods) && !empty($chosen_shipping_methods) ? $chosen_shipping_methods[0] : null,
+
 	]);
 }
 
@@ -455,21 +621,38 @@ function setCustomerDetails(WP_REST_Request $request) {
 	return new WP_REST_Response($checkout->get_checkout_fields());
 }
 
+function frontEndInit(WP_REST_Request $request) {
+	$customer = \Mcms\Api\WooRestRouteHandlers\get_customer($request)->data['customer'];
+	$cart = \Mcms\Api\WooRestRouteHandlers\get_cart($request)->data;
+	if ($customer['id'] === 0) {
+		return new WP_REST_Response([
+			'customer' => null,
+			'cart' => $cart,
+		]);
+	}
+
+
+	$customerData = [
+		'email' => $customer['email'],
+		'firstName' => $customer['first_name'],
+		'lastName' => $customer['last_name'],
+		'billing' => $customer['billing'],
+		'shipping' => $customer['shipping'],
+		'isLoggedIn' => true,
+	];
+
+	return new WP_REST_Response([
+		'customer' => $customerData,
+		'cart' => $cart,
+	]);
+}
+
 function get_customer(WP_REST_Request $request) {
 	if (!class_exists('WooCommerce')) {
 		return new WP_REST_Response(array('message' => 'WooCommerce is not active'), 500);
 	}
 
-	WC()->frontend_includes();
 
-	if (null === WC()->session) {
-		WC()->session = new WC_Session_Handler();
-		WC()->session->init();
-	}
-
-	if (null === WC()->cart) {
-		WC()->initialize_cart();
-	}
 
 	$auth_header = $request->get_header('Authorization');
 	$decoded = \Mcms\Includes\Auth\validate_jwt(substr($auth_header, 7));
@@ -578,18 +761,19 @@ $zone = getCustomerShippingZone($request);
 //$zone = WC_Shipping_Zone::get_zone($zone_id);
 
 // Get the shipping methods for the zone
-	$shipping_methods = $zone->get_shipping_methods();
+	$shipping_methods = $zone->get_shipping_methods(true, 'json');
 
 // Loop through each shipping method
 	foreach ($shipping_methods as $shipping_method) {
 		if (!$shipping_method->enabled || $shipping_method->enabled === 'no') {
 			continue;
 		}
-
+//print_r($shipping_method->instance_settings);
 		$methods[] = [
 			'id' => $shipping_method->id . ':' . $shipping_method->instance_id,
 			'slug' => $shipping_method->id,
 			'title' => $shipping_method->title,
+			'settings' => $shipping_method->instance_settings,
 			'baseCost' => !empty($shipping_method->cost) ? $shipping_method->cost : null,
 		];
 	}
@@ -622,12 +806,36 @@ function getCustomerShippingZone(WP_REST_Request $request) {
 	return \WC_Shipping_Zones::get_zone_matching_package($package);
 }
 
+function getPaymentSettings(WP_REST_Request $request) {
+	$gateway_id = $request->get_param('id');
+
+	$payment_gateways = WC()->payment_gateways()->payment_gateways();
+	$gateway = $payment_gateways[$gateway_id];
+
+	if (strpos($gateway->id, 'stripe') !== false) {
+		$stripe = new \Mcms\Api\StripeRestRouteHandlers\StripeRestRouteHandlers();
+
+		return new WP_REST_Response([
+			'publishable_key' => $stripe->publicKey,
+			'id' => 'stripe'
+		]);
+	}
+
+
+	return new WP_REST_Response($payment_gateways[$gateway_id]);
+
+}
+
 function getAvailablePaymentMethods() {
 	$payment_gateways = WC()->payment_gateways()->get_available_payment_gateways();
 
 	$enabled_gateways = [];
 
 	foreach ($payment_gateways as $gateway) {
+		if (empty($gateway->title)) {
+			continue;
+		}
+
 		$enabled_gateways[] = [
 			'id' => $gateway->id,
 			'title' => $gateway->title,
@@ -641,3 +849,5 @@ function getAvailablePaymentMethods() {
 
 	return $enabled_gateways;
 }
+
+
